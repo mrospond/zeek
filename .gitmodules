@@ -76,3 +76,6 @@
 [submodule "auxil/vcpkg"]
 	path = auxil/vcpkg
 	url = https://github.com/microsoft/vcpkg
+[submodule "auxil/opentelemetry-cpp"]
+	path = auxil/opentelemetry-cpp
+	url = https://github.com/zeek/opentelemetry-cpp

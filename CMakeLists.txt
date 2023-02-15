@@ -266,6 +266,8 @@ foreach (name zeek_exe zeek_lib zeek_fuzzer_shared)
     if (TARGET ${name})
         target_compile_definitions(${name} PRIVATE ZEEK_CONFIG_SKIP_VERSION_H)
         target_compile_options(${name} PRIVATE ${WERROR_FLAG})
+        target_compile_definitions(${name} PRIVATE OPENTELEMETRY_STL_VERSION=2017)
+        target_compile_definitions(${name} PRIVATE OPENTELEMETRY_ABI_VERSION_NO=1)
     endif ()
 endforeach ()
 
@@ -356,6 +358,8 @@ function (zeek_add_subdir_library name)
     target_compile_features(${target_name} PRIVATE ${ZEEK_CXX_STD})
     set_target_properties(${target_name} PROPERTIES CXX_EXTENSIONS OFF)
     target_compile_definitions(${target_name} PRIVATE ZEEK_CONFIG_SKIP_VERSION_H)
+    target_compile_definitions(${target_name} PRIVATE OPENTELEMETRY_STL_VERSION=2017)
+    target_compile_definitions(${target_name} PRIVATE OPENTELEMETRY_ABI_VERSION_NO=1)
     add_dependencies(${target_name} zeek_autogen_files)
     target_link_libraries(${target_name} PRIVATE $<BUILD_INTERFACE:zeek_internal>)
     add_clang_tidy_files(${FN_ARGS_SOURCES})
@@ -1097,6 +1101,8 @@ include(GetArchitecture)
 # have the paths or library when it builds.
 include(FindCAres)
 include(FindKqueue)
+
+include(FindOpenTelemetry)
 
 include_directories(BEFORE "auxil/out_ptr/include")
 
