@@ -73,3 +73,6 @@
 [submodule "auxil/zeekjs"]
 	path = auxil/zeekjs
 	url = https://github.com/corelight/zeekjs.git
+[submodule "auxil/prometheus-cpp"]
+	path = auxil/prometheus-cpp
+	url = https://github.com/jupp0r/prometheus-cpp
