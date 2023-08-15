@@ -307,8 +307,8 @@ private:
 	FuncPtr rotation_format_func;
 	FuncPtr log_stream_policy_hook;
 
-	telemetry::IntCounterFamily total_log_stream_writes_family;
-	telemetry::IntCounterFamily total_log_writer_writes_family;
+	std::shared_ptr<telemetry::IntCounterFamily> total_log_stream_writes_family;
+	std::shared_ptr<telemetry::IntCounterFamily> total_log_writer_writes_family;
 	};
 
 	} // namespace logging;

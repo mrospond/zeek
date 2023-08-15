@@ -9,7 +9,6 @@
 #include "zeek/Type.h"
 #include "zeek/ZeekArgs.h"
 #include "zeek/ZeekList.h"
-#include "zeek/telemetry/Counter.h"
 
 namespace zeek
 	{
@@ -18,6 +17,11 @@ namespace run_state
 	{
 extern double network_time;
 	} // namespace run_state
+
+namespace telemetry
+	{
+class IntCounter;
+	}
 
 class Func;
 using FuncPtr = IntrusivePtr<Func>;
@@ -62,7 +66,7 @@ public:
 		}
 	bool GenerateAlways() const { return generate_always; }
 
-	uint64_t CallCount() const { return call_count ? call_count->Value() : 0; }
+	uint64_t CallCount() const;
 
 private:
 	void NewEvent(zeek::Args* vl); // Raise new_event() meta event.
@@ -76,7 +80,7 @@ private:
 	bool generate_always;
 
 	// Initialize this lazy, so we don't expose metrics for 0 values.
-	std::optional<zeek::telemetry::IntCounter> call_count;
+	std::shared_ptr<zeek::telemetry::IntCounter> call_count;
 
 	std::unordered_set<std::string> auto_publish;
 	};

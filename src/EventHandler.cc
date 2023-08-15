@@ -60,7 +60,7 @@ void EventHandler::Call(Args* vl, bool no_remote, double ts)
 			"zeek", "event-handler-invocations", {"name"},
 			"Number of times the given event handler was called", "1", true);
 
-		call_count = eh_invocations_family.GetOrAdd({{"name", name}});
+		call_count = eh_invocations_family->GetOrAdd({{"name", name}});
 		}
 
 	call_count->Inc();
@@ -132,6 +132,11 @@ void EventHandler::NewEvent(Args* vl)
 									   std::move(vargs),
 								   });
 	event_mgr.Dispatch(ev);
+	}
+
+uint64_t EventHandler::CallCount() const
+	{
+	return call_count ? call_count->Value() : 0;
 	}
 
 	} // namespace zeek

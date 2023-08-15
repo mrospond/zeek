@@ -422,18 +422,18 @@ private:
 class TelemetryVal : public OpaqueVal
 	{
 protected:
-	explicit TelemetryVal(telemetry::IntCounter);
-	explicit TelemetryVal(telemetry::IntCounterFamily);
-	explicit TelemetryVal(telemetry::DblCounter);
-	explicit TelemetryVal(telemetry::DblCounterFamily);
-	explicit TelemetryVal(telemetry::IntGauge);
-	explicit TelemetryVal(telemetry::IntGaugeFamily);
-	explicit TelemetryVal(telemetry::DblGauge);
-	explicit TelemetryVal(telemetry::DblGaugeFamily);
-	explicit TelemetryVal(telemetry::IntHistogram);
-	explicit TelemetryVal(telemetry::IntHistogramFamily);
-	explicit TelemetryVal(telemetry::DblHistogram);
-	explicit TelemetryVal(telemetry::DblHistogramFamily);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntCounter>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntCounterFamily>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblCounter>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblCounterFamily>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntGauge>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntGaugeFamily>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblGauge>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblGaugeFamily>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntHistogram>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::IntHistogramFamily>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblHistogram>);
+	explicit TelemetryVal(std::shared_ptr<telemetry::DblHistogramFamily>);
 
 	broker::expected<broker::data> DoSerialize() const override;
 	bool DoUnserialize(const broker::data& data) override;
@@ -442,11 +442,11 @@ protected:
 template <class Handle> class TelemetryValImpl : public TelemetryVal
 	{
 public:
-	using HandleType = Handle;
+	using HandleType = std::shared_ptr<Handle>;
 
-	explicit TelemetryValImpl(Handle hdl) : TelemetryVal(hdl), hdl(hdl) { }
+	explicit TelemetryValImpl(HandleType hdl) : TelemetryVal(hdl), hdl(hdl) { }
 
-	Handle GetHandle() const noexcept { return hdl; }
+	HandleType GetHandle() const noexcept { return hdl; }
 
 protected:
 	ValPtr DoClone(CloneState*) override { return make_intrusive<TelemetryValImpl>(hdl); }
@@ -454,7 +454,7 @@ protected:
 	const char* OpaqueName() const override { return Handle::OpaqueName; }
 
 private:
-	Handle hdl;
+	HandleType hdl;
 	};
 
 using IntCounterMetricVal = TelemetryValImpl<telemetry::IntCounter>;

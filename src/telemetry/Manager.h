@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <string_view>
 #include <unordered_map>
 #include <variant>
@@ -15,12 +16,8 @@
 #include "zeek/telemetry/Gauge.h"
 #include "zeek/telemetry/Histogram.h"
 
-#include "broker/telemetry/fwd.hh"
-
-namespace broker
-	{
-class endpoint;
-	}
+#include "prometheus/exposer.h"
+#include "prometheus/registry.h"
 
 namespace zeek
 	{
@@ -39,7 +36,7 @@ namespace zeek::telemetry
 /**
  * Manages a collection of metric families.
  */
-class Manager
+class Manager final
 	{
 public:
 	friend class Broker::Manager;
@@ -50,119 +47,13 @@ public:
 
 	Manager& operator=(const Manager&) = delete;
 
-	virtual ~Manager() = default;
+	~Manager();
 
 	/**
 	 * Initialization of the manager. This is called late during Zeek's
 	 * initialization after any scripts are processed.
 	 */
-	virtual void InitPostScript();
-
-	/**
-	 * Supported metric types.
-	 */
-	enum class MetricType
-		{
-		Counter,
-		Gauge,
-		Histogram
-		};
-
-	/**
-	 * Captures information about counter and gauge metrics.
-	 */
-	struct CollectedValueMetric
-		{
-		/**
-		 * Constructor.
-		 * @param metric_type The type of this metric.
-		 * @param family Broker layer family handle for this metric.
-		 * @param label_values The string values for each of the metric's labels.
-		 * @param value The metric's current value.
-		 */
-		CollectedValueMetric(MetricType metric_type,
-		                     const broker::telemetry::metric_family_hdl* family,
-		                     std::vector<std::string_view> label_values,
-		                     std::variant<double, int64_t> value)
-			: metric_type(metric_type), family(family), label_values(std::move(label_values)),
-			  value(value)
-			{
-			}
-
-		/**
-		 * @return A script layer Telemetry::Metric record for this metric.
-		 */
-		zeek::RecordValPtr AsMetricRecord() const;
-
-		enum MetricType metric_type;
-		const broker::telemetry::metric_family_hdl* family;
-		std::vector<std::string_view> label_values;
-		std::variant<double, int64_t> value;
-		};
-
-	/**
-	 * Captures information about histogram metrics.
-	 */
-	struct CollectedHistogramMetric
-		{
-		/**
-		 * Helper struct representing a single bucket of a histogram.
-		 * @tparam T The data type used by the histogram (double or int64_t).
-		 */
-		template <class T> struct Bucket
-			{
-			Bucket(T count, T upper_bound) : count(count), upper_bound(upper_bound) { }
-
-			T count;
-			T upper_bound;
-			};
-
-		/**
-		 * Helper struct representing a histogram as sum and buckets.
-		 * @tparam T The data type used by the histogram (double or int64_t).
-		 */
-		template <class T> struct HistogramData
-			{
-			T sum;
-			std::vector<Bucket<T>> buckets;
-			};
-
-		using DblHistogramData = HistogramData<double>;
-		using IntHistogramData = HistogramData<int64_t>;
-
-		/**
-		 * Constructor.
-		 * @param family Broker layer family handle for this metric.
-		 * @param label_values The string values for each of the metric's labels.
-		 * @param histogram The histogram's data (sum and individual buckets).
-		 */
-		CollectedHistogramMetric(const broker::telemetry::metric_family_hdl* family,
-		                         std::vector<std::string_view> label_values,
-		                         std::variant<DblHistogramData, IntHistogramData> histogram)
-
-			: family(family), label_values(std::move(label_values)), histogram(std::move(histogram))
-			{
-			}
-
-		const broker::telemetry::metric_family_hdl* family;
-		std::vector<std::string_view> label_values;
-		std::variant<DblHistogramData, IntHistogramData> histogram;
-
-		/**
-		 * @return A script layer Telemetry::HistogramMetric record for this histogram.
-		 */
-		zeek::RecordValPtr AsHistogramMetricRecord() const;
-		};
-
-	/**
-	 * @return A script layer Telemetry::MetricOpts record for the given metric family.
-	 * @param metric_typ The type of metric.
-	 * @param family Broker layer family handle for the family.
-	 * @tparam T The underlying data type (double or int64_t)
-	 */
-	template <typename T>
-	zeek::RecordValPtr GetMetricOptsRecord(MetricType metric_type,
-	                                       const broker::telemetry::metric_family_hdl* family);
+	void InitPostScript();
 
 	/**
 	 * @return All counter and gauge metrics and their values matching prefix and name.
@@ -195,17 +86,30 @@ public:
 	                   Span<const std::string_view> labels, std::string_view helptext,
 	                   std::string_view unit = "1", bool is_sum = false)
 		{
+		auto fam = LookupFamily(prefix, name);
+
 		if constexpr ( std::is_same<ValueType, int64_t>::value )
 			{
-			auto fam = int_counter_fam(Ptr(), prefix, name, labels, helptext, unit, is_sum);
-			return IntCounterFamily{fam};
+			if ( fam )
+				return std::static_pointer_cast<IntCounterFamily>(fam);
+
+			auto int_fam = std::make_shared<IntCounterFamily>(prefix, name, labels, helptext,
+			                                                  *registry, unit, is_sum);
+			families.push_back(int_fam);
+			return int_fam;
 			}
 		else
 			{
 			static_assert(std::is_same<ValueType, double>::value,
 			              "metrics only support int64_t and double values");
-			auto fam = dbl_counter_fam(Ptr(), prefix, name, labels, helptext, unit, is_sum);
-			return DblCounterFamily{fam};
+
+			if ( fam )
+				return std::static_pointer_cast<DblCounterFamily>(fam);
+
+			auto dbl_fam = std::make_shared<DblCounterFamily>(prefix, name, labels, helptext,
+			                                                  *registry, unit, is_sum);
+			families.push_back(dbl_fam);
+			return dbl_fam;
 			}
 		}
 
@@ -238,7 +142,8 @@ public:
 		return WithLabelNames(labels,
 		                      [&, this](auto labelNames)
 		                      {
-								  auto family = CounterFamily<ValueType>(prefix, name, labelNames,
+								  auto family = CounterFamily<ValueType>(prefix, name,
+			                                                             convert_labels(labelNames),
 			                                                             helptext, unit, is_sum);
 								  return family.getOrAdd(labels);
 							  });
@@ -270,17 +175,29 @@ public:
 	                 Span<const std::string_view> labels, std::string_view helptext,
 	                 std::string_view unit = "1", bool is_sum = false)
 		{
+		auto fam = LookupFamily(prefix, name);
+
 		if constexpr ( std::is_same<ValueType, int64_t>::value )
 			{
-			auto fam = int_gauge_fam(Ptr(), prefix, name, labels, helptext, unit, is_sum);
-			return IntGaugeFamily{fam};
+			if ( fam )
+				return std::static_pointer_cast<IntGaugeFamily>(fam);
+
+			auto int_fam = std::make_shared<IntGaugeFamily>(prefix, name, labels, helptext,
+			                                                *registry, unit, is_sum);
+			families.push_back(int_fam);
+			return int_fam;
 			}
 		else
 			{
 			static_assert(std::is_same<ValueType, double>::value,
 			              "metrics only support int64_t and double values");
-			auto fam = dbl_gauge_fam(Ptr(), prefix, name, labels, helptext, unit, is_sum);
-			return DblGaugeFamily{fam};
+			if ( fam )
+				return std::static_pointer_cast<DblGaugeFamily>(fam);
+
+			auto dbl_fam = std::make_shared<DblGaugeFamily>(prefix, name, labels, helptext,
+			                                                *registry, unit, is_sum);
+			families.push_back(dbl_fam);
+			return dbl_fam;
 			}
 		}
 
@@ -313,7 +230,8 @@ public:
 		return WithLabelNames(labels,
 		                      [&, this](auto labelNames)
 		                      {
-								  auto family = GaugeFamily<ValueType>(prefix, name, labelNames,
+								  auto family = GaugeFamily<ValueType>(prefix, name,
+			                                                           convert_labels(labelNames),
 			                                                           helptext, unit, is_sum);
 								  return family.getOrAdd(labels);
 							  });
@@ -367,19 +285,31 @@ public:
 	                     ConstSpan<ValueType> default_upper_bounds, std::string_view helptext,
 	                     std::string_view unit = "1", bool is_sum = false)
 		{
+		auto fam = LookupFamily(prefix, name);
+
 		if constexpr ( std::is_same<ValueType, int64_t>::value )
 			{
-			auto fam = int_histogram_fam(Ptr(), prefix, name, labels, default_upper_bounds,
-			                             helptext, unit, is_sum);
-			return IntHistogramFamily{fam};
+			// TODO: pass upper bounds
+			if ( fam )
+				return std::static_pointer_cast<IntHistogramFamily>(fam);
+
+			auto int_fam = std::make_shared<IntHistogramFamily>(prefix, name, labels, helptext,
+			                                                    *registry, unit, is_sum);
+			families.push_back(int_fam);
+			return int_fam;
 			}
 		else
 			{
 			static_assert(std::is_same<ValueType, double>::value,
 			              "metrics only support int64_t and double values");
-			auto fam = dbl_histogram_fam(Ptr(), prefix, name, labels, default_upper_bounds,
-			                             helptext, unit, is_sum);
-			return DblHistogramFamily{fam};
+			// TODO: pass upper bounds
+			if ( fam )
+				return std::static_pointer_cast<DblHistogramFamily>(fam);
+
+			auto dbl_fam = std::make_shared<DblHistogramFamily>(prefix, name, labels, helptext,
+			                                                    *registry, unit, is_sum);
+			families.push_back(dbl_fam);
+			return dbl_fam;
 			}
 		}
 
@@ -424,9 +354,9 @@ public:
 		return WithLabelNames(labels,
 		                      [&, this](auto labelNames)
 		                      {
-								  auto family = HistogramFamily<ValueType>(prefix, name, labelNames,
-			                                                               default_upper_bounds,
-			                                                               helptext, unit, is_sum);
+								  auto family = HistogramFamily<ValueType>(
+									  prefix, name, convert_labels(labelNames),
+									  default_upper_bounds, helptext, unit, is_sum);
 								  return family.getOrAdd(labels);
 							  });
 		}
@@ -464,18 +394,18 @@ protected:
 			}
 		}
 
-	broker::telemetry::metric_registry_impl* Ptr() { return pimpl.get(); }
-
-	// Connects all the dots after the Broker Manager constructed the endpoint
-	// for this Zeek instance. Called from Broker::Manager::InitPostScript().
-	void InitPostBrokerSetup(broker::endpoint&);
-
-	IntrusivePtr<broker::telemetry::metric_registry_impl> pimpl;
-
 private:
-	// Caching of metric_family_hdl instances to their Zeek record representation.
-	std::unordered_map<const broker::telemetry::metric_family_hdl*, zeek::RecordValPtr>
-		metric_opts_cache;
+	std::shared_ptr<MetricFamily> LookupFamily(std::string_view prefix,
+	                                           std::string_view name) const;
+
+	std::string metrics_name;
+	std::string metrics_version;
+	std::string metrics_schema;
+
+	std::unique_ptr<prometheus::Exposer> exposer;
+	std::shared_ptr<prometheus::Registry> registry;
+
+	std::vector<std::shared_ptr<MetricFamily>> families;
 	};
 
 	} // namespace zeek::telemetry

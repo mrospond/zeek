@@ -1110,36 +1110,60 @@ bool TelemetryVal::DoUnserialize(const broker::data&)
 	return false;
 	}
 
-TelemetryVal::TelemetryVal(telemetry::IntCounter) : OpaqueVal(int_counter_metric_type) { }
-
-TelemetryVal::TelemetryVal(telemetry::IntCounterFamily) : OpaqueVal(int_counter_metric_family_type)
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntCounter>)
+	: OpaqueVal(int_counter_metric_type)
 	{
 	}
 
-TelemetryVal::TelemetryVal(telemetry::DblCounter) : OpaqueVal(dbl_counter_metric_type) { }
-
-TelemetryVal::TelemetryVal(telemetry::DblCounterFamily) : OpaqueVal(dbl_counter_metric_family_type)
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntCounterFamily>)
+	: OpaqueVal(int_counter_metric_family_type)
 	{
 	}
 
-TelemetryVal::TelemetryVal(telemetry::IntGauge) : OpaqueVal(int_gauge_metric_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblCounter>)
+	: OpaqueVal(dbl_counter_metric_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::IntGaugeFamily) : OpaqueVal(int_gauge_metric_family_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblCounterFamily>)
+	: OpaqueVal(dbl_counter_metric_family_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::DblGauge) : OpaqueVal(dbl_gauge_metric_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntGauge>) : OpaqueVal(int_gauge_metric_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::DblGaugeFamily) : OpaqueVal(dbl_gauge_metric_family_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntGaugeFamily>)
+	: OpaqueVal(int_gauge_metric_family_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::IntHistogram) : OpaqueVal(int_histogram_metric_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblGauge>) : OpaqueVal(dbl_gauge_metric_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::IntHistogramFamily)
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblGaugeFamily>)
+	: OpaqueVal(dbl_gauge_metric_family_type)
+	{
+	}
+
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntHistogram>)
+	: OpaqueVal(int_histogram_metric_type)
+	{
+	}
+
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::IntHistogramFamily>)
 	: OpaqueVal(int_histogram_metric_family_type)
 	{
 	}
 
-TelemetryVal::TelemetryVal(telemetry::DblHistogram) : OpaqueVal(dbl_histogram_metric_type) { }
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblHistogram>)
+	: OpaqueVal(dbl_histogram_metric_type)
+	{
+	}
 
-TelemetryVal::TelemetryVal(telemetry::DblHistogramFamily)
+TelemetryVal::TelemetryVal(std::shared_ptr<telemetry::DblHistogramFamily>)
 	: OpaqueVal(dbl_histogram_metric_family_type)
 	{
 	}
