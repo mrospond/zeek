@@ -12,7 +12,6 @@
 #include "zeek/telemetry/ProcessStats.h"
 #include "zeek/telemetry/Timer.h"
 #include "zeek/telemetry/telemetry.bif.h"
-#include "zeek/zeek-version.h"
 
 #include "opentelemetry/exporters/ostream/metric_exporter_factory.h"
 #include "opentelemetry/exporters/prometheus/exporter_factory.h"
@@ -23,9 +22,6 @@
 #include "opentelemetry/sdk/metrics/meter_provider.h"
 #include "opentelemetry/sdk/metrics/meter_provider_factory.h"
 #include "opentelemetry/sdk/metrics/push_metric_exporter.h"
-#include "opentelemetry/sdk/metrics/view/instrument_selector_factory.h"
-#include "opentelemetry/sdk/metrics/view/meter_selector_factory.h"
-#include "opentelemetry/sdk/metrics/view/view_factory.h"
 
 namespace metrics_sdk = opentelemetry::sdk::metrics;
 namespace common = opentelemetry::common;
@@ -110,12 +106,14 @@ void build_observation(const std::map<std::pair<std::string, std::string>, T>& v
     }
 }
 
-Manager::Manager()
-    : metrics_name("zeek"), metrics_version(VERSION), metrics_schema("https://opentelemetry.io/schemas/1.2.0") {
+Manager::Manager() : metrics_schema("https://opentelemetry.io/schemas/1.2.0") {
     auto meter_provider = metrics_sdk::MeterProviderFactory::Create();
     auto* p = static_cast<metrics_sdk::MeterProvider*>(meter_provider.release());
-    std::shared_ptr<metrics_api::MeterProvider> provider_sp(p);
+    std::shared_ptr<metrics_api::MeterProvider> provider_sp{p};
     metrics_api::Provider::SetMeterProvider(provider_sp);
+
+    otel_reader = std::make_shared<OtelReader>();
+    p->AddMetricReader(otel_reader);
 }
 
 Manager::~Manager() {
@@ -126,9 +124,6 @@ Manager::~Manager() {
 void Manager::InitPostScript() {
     auto mp = metrics_api::Provider::GetMeterProvider();
     auto* p = static_cast<metrics_sdk::MeterProvider*>(mp.get());
-
-    otel_reader = std::make_shared<OtelReader>();
-    p->AddMetricReader(otel_reader);
 
     std::string prometheus_url;
     auto metrics_port = id::find_val("Broker::metrics_port")->AsPortVal();
@@ -338,7 +333,10 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
         for ( const auto& instrumentation_info : metric_data.scope_metric_data_ ) {
             // Metric data = family
             for ( const auto& metric : instrumentation_info.metric_data_ ) {
-                auto it = matched_families.find(metric.instrument_descriptor.name_);
+                std::string descriptor_name = metric.instrument_descriptor.name_;
+                if ( util::starts_with(descriptor_name, "bounds_view_") )
+                    descriptor_name = descriptor_name.substr(12);
+                auto it = matched_families.find(descriptor_name);
                 if ( it == matched_families.end() )
                     continue;
 
@@ -373,15 +371,33 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
 
                     r->Assign(observations_idx, as_double_val(histogram_point_data.count_));
 
-                    double sum = 0.0;
+                    auto counts_double_vec = make_intrusive<zeek::VectorVal>(double_vec_type);
+                    auto counts_count_vec = make_intrusive<zeek::VectorVal>(count_vec_type);
+                    for ( auto val : counts ) {
+                        counts_double_vec->Append(as_double_val(val));
+                        counts_count_vec->Append(val_mgr->Count(val));
+                    }
+                    r->Assign(values_idx, counts_double_vec);
+
                     if ( opentelemetry::nostd::holds_alternative<double>(histogram_point_data.sum_) ) {
                         r->Assign(sum_idx, as_double_val(opentelemetry::nostd::get<double>(histogram_point_data.sum_)));
+
+                        // Add an "infinite" bucket to the set of buckets reported to script-land.
+                        // OTEL has one of these internally but doesn't report it in the list of
+                        // boundaries, so the vectors of counts and boundaries are different sizes.
+                        boundaries.push_back(std::numeric_limits<double>::infinity());
                     }
                     else {
                         int64_t v = opentelemetry::nostd::get<int64_t>(histogram_point_data.sum_);
                         r->Assign(sum_idx, as_double_val(v));
                         r->Assign(count_sum_idx, val_mgr->Count(v));
                         r->Assign(count_observations_idx, val_mgr->Count(histogram_point_data.count_));
+                        r->Assign(count_values_idx, counts_count_vec);
+
+                        // Add an "infinite" bucket to the set of buckets reported to script-land.
+                        // OTEL has one of these internally but doesn't report it in the list of
+                        // boundaries, so the vectors of counts and boundaries are different sizes.
+                        boundaries.push_back(std::numeric_limits<int64_t>::infinity());
                     }
 
                     RecordValPtr local_opts_record = r->GetField<RecordVal>(opts_idx);
@@ -392,11 +408,6 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
                         bounds_vec->Append(as_double_val(val));
                     local_opts_record->Assign(bounds_idx, bounds_vec);
 
-                    auto counts_vec = make_intrusive<zeek::VectorVal>(double_vec_type);
-                    for ( auto val : counts )
-                        counts_vec->Append(as_double_val(val));
-                    r->Assign(values_idx, counts_vec);
-
                     ret_val->Append(r);
                 }
             }
@@ -405,18 +416,6 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
     });
 
     return ret_val;
-}
-
-void Manager::AddView(const std::string& name, const std::string& helptext, const std::string& unit,
-                      opentelemetry::sdk::metrics::InstrumentType instrument_type,
-                      opentelemetry::sdk::metrics::AggregationType aggregation) {
-    auto instrument_selector = metrics_sdk::InstrumentSelectorFactory::Create(instrument_type, name, unit);
-    auto meter_selector = metrics_sdk::MeterSelectorFactory::Create(metrics_name, metrics_version, metrics_schema);
-    auto view = metrics_sdk::ViewFactory::Create(name, helptext, unit, metrics_sdk::AggregationType::kHistogram);
-
-    auto mp = metrics_api::Provider::GetMeterProvider();
-    auto* p = static_cast<metrics_sdk::MeterProvider*>(mp.get());
-    p->AddView(std::move(instrument_selector), std::move(meter_selector), std::move(view));
 }
 
 /**

@@ -3,8 +3,19 @@
 #include <fnmatch.h>
 
 #include "zeek/Val.h"
+#include "zeek/telemetry/Manager.h"
 #include "zeek/telemetry/telemetry.bif.h"
 #include "zeek/util.h"
+#include "zeek/zeek-version.h"
+
+#include "opentelemetry/metrics/provider.h"
+#include "opentelemetry/sdk/metrics/meter_provider.h"
+#include "opentelemetry/sdk/metrics/view/instrument_selector_factory.h"
+#include "opentelemetry/sdk/metrics/view/meter_selector_factory.h"
+#include "opentelemetry/sdk/metrics/view/view_factory.h"
+
+namespace metrics_sdk = opentelemetry::sdk::metrics;
+namespace metrics_api = opentelemetry::metrics;
 
 namespace zeek::telemetry {
 
@@ -54,6 +65,18 @@ RecordValPtr MetricFamily::GetMetricOptsRecord() const {
 bool MetricFamily::Matches(std::string_view prefix_pattern, std::string_view name_pattern) const noexcept {
     return fnmatch(prefix_pattern.data(), prefix.c_str(), 0) != FNM_NOMATCH &&
            fnmatch(name_pattern.data(), name.c_str(), 0) != FNM_NOMATCH;
+}
+
+void MetricFamily::AddGenericView(opentelemetry::sdk::metrics::InstrumentType instrument_type,
+                                  opentelemetry::sdk::metrics::AggregationType aggregation) {
+    auto instrument_selector = metrics_sdk::InstrumentSelectorFactory::Create(instrument_type, full_name, unit);
+    auto meter_selector = metrics_sdk::MeterSelectorFactory::Create(prefix, VERSION, telemetry_mgr->MetricsSchema());
+    auto view =
+        metrics_sdk::ViewFactory::Create("view_" + full_name, helptext, unit, metrics_sdk::AggregationType::kHistogram);
+
+    auto mp = metrics_api::Provider::GetMeterProvider();
+    auto* p = static_cast<metrics_sdk::MeterProvider*>(mp.get());
+    p->AddView(std::move(instrument_selector), std::move(meter_selector), std::move(view));
 }
 
 MetricAttributeIterable::MetricAttributeIterable(Span<const LabelView> labels) {

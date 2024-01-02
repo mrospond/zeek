@@ -10,6 +10,7 @@
 #include "zeek/Val.h"
 
 #include "opentelemetry/common/key_value_iterable.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
 
 namespace zeek::telemetry {
 
@@ -95,6 +96,12 @@ public:
 protected:
     MetricFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> lbls,
                  std::string_view helptext, std::string_view unit = "1", bool is_sum = false);
+
+    /**
+     * Adds a view to the MeterProvider.
+     */
+    void AddGenericView(opentelemetry::sdk::metrics::InstrumentType instrument_type,
+                        opentelemetry::sdk::metrics::AggregationType aggregation);
 
     std::string prefix;
     std::string name;
