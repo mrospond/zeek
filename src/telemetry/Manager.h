@@ -399,8 +399,8 @@ private:
     std::string export_topic;
     std::vector<std::string> import_topics;
     std::string export_endpoint;
-    std::string export_prefix;
-    zeek_uint_t export_interval = 0;
+    std::vector<std::string> export_prefixes;
+    double export_interval = 0.0;
 };
 
 } // namespace zeek::telemetry

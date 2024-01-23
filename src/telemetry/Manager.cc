@@ -8,7 +8,9 @@
 
 #include "zeek/3rdparty/doctest.h"
 #include "zeek/ID.h"
+#include "zeek/broker/Manager.h"
 #include "zeek/telemetry/OtelReader.h"
+#include "zeek/telemetry/OtelTopicExporter.h"
 #include "zeek/telemetry/ProcessStats.h"
 #include "zeek/telemetry/Timer.h"
 #include "zeek/telemetry/telemetry.bif.h"
@@ -126,17 +128,40 @@ void Manager::InitPostScript() {
     auto* p = static_cast<metrics_sdk::MeterProvider*>(mp.get());
 
     std::string prometheus_url;
-    auto metrics_port = id::find_val("Broker::metrics_port")->AsPortVal();
-    if ( metrics_port->Port() != 0 )
-        prometheus_url = util::fmt("localhost:%u", metrics_port->Port());
-    else if ( auto env = getenv("BROKER_METRICS_PORT") )
+    if ( auto env = getenv("ZEEK_METRICS_PORT") )
         prometheus_url = util::fmt("localhost:%s", env);
+    else if ( auto env = getenv("BROKER_METRICS_PORT") ) {
+        reporter->Warning("BROKER_METRICS_PORT is deprecated, use ZEEK_METRICS_PORT.");
+        prometheus_url = util::fmt("localhost:%s", env);
+    }
+    else {
+        auto metrics_port = id::find_val("Telemetry::metrics_port")->AsPortVal();
+        if ( metrics_port->Port() != 0 )
+            prometheus_url = util::fmt("localhost:%u", metrics_port->Port());
+    }
 
     if ( ! prometheus_url.empty() ) {
         opentelemetry::exporter::metrics::PrometheusExporterOptions exporter_options;
         exporter_options.url = prometheus_url;
         auto exporter = exportermetrics::PrometheusExporterFactory::Create(exporter_options);
         p->AddMetricReader(std::move(exporter));
+
+        // Import topics are only enabled if Prometheus is enabled, because we don't care
+        // to get imported metrics if we're just going to drop them on the floor.
+        auto topics = import_topics;
+        if ( auto env = getenv("ZEEK_METRICS_IMPORT_TOPICS") ) {
+            topics = util::split(std::string{env}, ":");
+        }
+        else if ( auto env = getenv("BROKER_METRICS_IMPORT_TOPICS") ) {
+            reporter->Warning("BROKER_METRICS_IMPORT_TOPICS is deprecated, use ZEEK_METRICS_IMPORT_TOPICS.");
+            topics = util::split(std::string{env}, ":");
+        }
+
+        for ( const auto& topic : topics ) {
+            broker_mgr->Subscribe(topic);
+        }
+
+        // TODO: Process incoming data
     }
 
     if ( auto env = getenv("OTEL_DEBUG") ) {
@@ -145,6 +170,32 @@ void Manager::InitPostScript() {
         options.export_interval_millis = std::chrono::milliseconds(1000);
         options.export_timeout_millis = std::chrono::milliseconds(500);
         auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(os_exporter), options);
+        p->AddMetricReader(std::move(reader));
+    }
+
+    // If the export topic is set, create a periodic exporter to write data to it
+    if ( ! export_topic.empty() ) {
+        auto topic = export_topic;
+        if ( auto env = getenv("ZEEK_METRICS_EXPORT_TOPIC") )
+            topic = env;
+        else if ( auto env = getenv("BROKER_METRICS_EXPORT_TOPIC") ) {
+            reporter->Warning("BROKER_METRICS_EXPORT_TOPIC is deprecated, use ZEEK_METRICS_EXPORT_TOPIC.");
+            topic = env;
+        }
+
+        auto endpoint = export_endpoint;
+        if ( auto env = getenv("ZEEK_METRICS_ENDPOINT_NAME") )
+            endpoint = env;
+        else if ( auto env = getenv("BROKER_METRICS_ENDPOINT_NAME") ) {
+            reporter->Warning("BROKER_METRICS_ENDPOINT_NAME is deprecated, use ZEEK_METRICS_ENDPOINT_NAME.");
+            endpoint = env;
+        }
+
+        auto topic_exporter = std::make_unique<detail::OtelTopicExporter>(topic, endpoint, export_prefixes);
+        metrics_sdk::PeriodicExportingMetricReaderOptions options;
+        options.export_interval_millis = std::chrono::seconds(static_cast<long long>(export_interval));
+        options.export_timeout_millis = std::chrono::milliseconds(500);
+        auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(topic_exporter), options);
         p->AddMetricReader(std::move(reader));
     }
 
@@ -423,28 +474,28 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
  * Passing a zero-length interval has no effect.
  * @param value Interval between two scrapes in seconds.
  */
-void Manager::SetMetricsExportInterval(double value) {}
+void Manager::SetMetricsExportInterval(double value) { export_interval = value; }
 
 /**
  * Sets a new target topic for the metrics. Passing an empty string has no
  * effect.
  * @param value The new topic for publishing local metrics to.
  */
-void Manager::SetMetricsExportTopic(std::string value) {}
+void Manager::SetMetricsExportTopic(std::string value) { export_topic = std::move(value); }
 
 /**
  * Sets the import topics for a node importing metrics.
  *
  * @param topics List of topics from which to import metrics.
  */
-void Manager::SetMetricsImportTopics(std::vector<std::string> topics) {}
+void Manager::SetMetricsImportTopics(std::vector<std::string> topics) { import_topics = std::move(topics); }
 
 /**
  * Sets a new ID for the metrics exporter. Passing an empty string has no
  * effect.
  * @param value The new ID of the exporter in published metrics.
  */
-void Manager::SetMetricsExportEndpointName(std::string value) {}
+void Manager::SetMetricsExportEndpointName(std::string value) { export_endpoint = std::move(value); }
 
 /**
  * Sets a prefix selection for the metrics exporter. An empty vector selects
@@ -452,7 +503,7 @@ void Manager::SetMetricsExportEndpointName(std::string value) {}
  * @param filter List of selected metric prefixes or an empty vector for
  *               selecting all metrics.
  */
-void Manager::SetMetricsExportPrefixes(std::vector<std::string> filter) {}
+void Manager::SetMetricsExportPrefixes(std::vector<std::string> filter) { export_prefixes = std::move(filter); }
 
 
 } // namespace zeek::telemetry
