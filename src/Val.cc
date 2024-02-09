@@ -922,35 +922,72 @@ static std::variant<ValPtr, std::string> BuildVal(const rapidjson::Value& j, con
         }
 
         case TYPE_INTERVAL: {
-            if ( ! j.IsNumber() )
-                return mismatch_err();
+            if ( j.IsNumber() )
+                return make_intrusive<IntervalVal>(j.GetDouble());
 
-            return make_intrusive<IntervalVal>(j.GetDouble());
+            if ( j.IsString() ) {
+                auto parts = util::split(j.GetString(), " ");
+                if ( parts.size() != 2 )
+                    return "wrong interval format, must be 'value {day|hr|min|sec|msec|usec}'";
+
+                auto value = std::stod(std::string{parts[0]});
+                if ( parts[1] == "day" || parts[1] == "days" )
+                    return make_intrusive<IntervalVal>(value, Days);
+                else if ( parts[1] == "hr" || parts[1] == "hrs" )
+                    return make_intrusive<IntervalVal>(value, Hours);
+                else if ( parts[1] == "min" || parts[1] == "mins" )
+                    return make_intrusive<IntervalVal>(value, Minutes);
+                else if ( parts[1] == "sec" || parts[1] == "secs" )
+                    return make_intrusive<IntervalVal>(value, Seconds);
+                else if ( parts[1] == "msec" || parts[1] == "msecs" )
+                    return make_intrusive<IntervalVal>(value, Milliseconds);
+                else if ( parts[1] == "usec" || parts[1] == "usecs" )
+                    return make_intrusive<IntervalVal>(value, Microseconds);
+                else
+                    return "wrong interval format, must be 'value {day|hr|min|sec|msec|usec}'";
+            }
+
+            return mismatch_err();
         }
 
         case TYPE_PORT: {
-            if ( ! j.IsString() )
-                return mismatch_err();
-
-            int port = 0;
-            if ( j.GetStringLength() > 0 && j.GetStringLength() < 10 ) {
-                char* slash;
-                errno = 0;
-                port = strtol(j.GetString(), &slash, 10);
-                if ( ! errno ) {
-                    ++slash;
-                    if ( util::streq(slash, "tcp") )
-                        return val_mgr->Port(port, TRANSPORT_TCP);
-                    else if ( util::streq(slash, "udp") )
-                        return val_mgr->Port(port, TRANSPORT_UDP);
-                    else if ( util::streq(slash, "icmp") )
-                        return val_mgr->Port(port, TRANSPORT_ICMP);
-                    else if ( util::streq(slash, "unknown") )
-                        return val_mgr->Port(port, TRANSPORT_UNKNOWN);
+            if ( j.IsString() ) {
+                int port = 0;
+                if ( j.GetStringLength() > 0 && j.GetStringLength() < 10 ) {
+                    char* slash;
+                    errno = 0;
+                    port = strtol(j.GetString(), &slash, 10);
+                    if ( ! errno ) {
+                        ++slash;
+                        if ( util::streq(slash, "tcp") )
+                            return val_mgr->Port(port, TRANSPORT_TCP);
+                        else if ( util::streq(slash, "udp") )
+                            return val_mgr->Port(port, TRANSPORT_UDP);
+                        else if ( util::streq(slash, "icmp") )
+                            return val_mgr->Port(port, TRANSPORT_ICMP);
+                        else if ( util::streq(slash, "unknown") )
+                            return val_mgr->Port(port, TRANSPORT_UNKNOWN);
+                    }
                 }
+
+                return "wrong port string format, must be /[0-9]{1,5}\\/(tcp|udp|icmp|unknown)/";
+            }
+            else if ( j.IsObject() ) {
+                const auto& obj = j.GetObject();
+                int port = 0;
+                port = obj["port"].GetInt();
+                const std::string& proto = obj["proto"].GetString();
+                if ( proto == "tcp" )
+                    return val_mgr->Port(port, TRANSPORT_TCP);
+                else if ( proto == "udp" )
+                    return val_mgr->Port(port, TRANSPORT_UDP);
+                else if ( proto == "icmp" )
+                    return val_mgr->Port(port, TRANSPORT_ICMP);
+                else if ( proto == "unknown" )
+                    return val_mgr->Port(port, TRANSPORT_UNKNOWN);
             }
 
-            return "wrong port format, must be /[0-9]{1,5}\\/(tcp|udp|icmp|unknown)/";
+            return mismatch_err();
         }
 
         case TYPE_PATTERN: {
@@ -1028,34 +1065,67 @@ static std::variant<ValPtr, std::string> BuildVal(const rapidjson::Value& j, con
         }
 
         case TYPE_TABLE: {
-            if ( ! j.IsArray() )
+            if ( (t->IsSet() && ! j.IsArray()) || (! t->IsSet() && ! j.IsObject()) )
                 return mismatch_err();
 
-            if ( ! t->IsSet() )
-                return util::fmt("tables are not supported");
+            if ( t->IsSet() && j.IsArray() ) {
+                auto tt = t->AsSetType();
+                auto tl = tt->GetIndices();
+                auto tv = make_intrusive<TableVal>(IntrusivePtr{NewRef{}, tt});
 
-            auto tt = t->AsSetType();
-            auto tl = tt->GetIndices();
-            auto tv = make_intrusive<TableVal>(IntrusivePtr{NewRef{}, tt});
+                for ( const auto& item : j.GetArray() ) {
+                    std::variant<ValPtr, std::string> v;
 
-            for ( const auto& item : j.GetArray() ) {
-                std::variant<ValPtr, std::string> v;
+                    if ( tl->GetTypes().size() == 1 )
+                        v = BuildVal(item, tl->GetPureType(), key_func);
+                    else
+                        v = BuildVal(item, tl, key_func);
 
-                if ( tl->GetTypes().size() == 1 )
-                    v = BuildVal(item, tl->GetPureType(), key_func);
-                else
-                    v = BuildVal(item, tl, key_func);
+                    if ( ! get_if<ValPtr>(&v) )
+                        return v;
 
-                if ( ! get_if<ValPtr>(&v) )
-                    return v;
+                    if ( ! std::get<ValPtr>(v) )
+                        continue;
 
-                if ( ! std::get<ValPtr>(v) )
-                    continue;
+                    tv->Assign(std::move(std::get<ValPtr>(v)), nullptr);
+                }
 
-                tv->Assign(std::move(std::get<ValPtr>(v)), nullptr);
+                return tv;
+            }
+            else if ( j.IsObject() ) {
+                auto tt = t->AsTableType();
+                auto tl = tt->GetIndices();
+                auto yt = tt->Yield();
+                auto tv = make_intrusive<TableVal>(IntrusivePtr{NewRef{}, tt});
+
+                for ( const auto& [key, value] : j.GetObject() ) {
+                    std::variant<ValPtr, std::string> k;
+                    if ( tl->GetTypes().size() == 1 )
+                        k = BuildVal(key, tl->GetPureType(), key_func);
+                    else
+                        k = BuildVal(key, tl, key_func);
+
+                    if ( ! get_if<ValPtr>(&k) )
+                        return k;
+
+                    if ( ! std::get<ValPtr>(k) )
+                        continue;
+
+                    std::variant<ValPtr, std::string> v = BuildVal(value, yt, key_func);
+
+                    if ( ! get_if<ValPtr>(&v) )
+                        return v;
+
+                    if ( ! std::get<ValPtr>(v) )
+                        continue;
+
+                    tv->Assign(std::move(std::get<ValPtr>(k)), std::move(std::get<ValPtr>(v)));
+                }
+
+                return tv;
             }
 
-            return tv;
+            return mismatch_err();
         }
 
         case TYPE_RECORD: {
