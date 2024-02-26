@@ -112,7 +112,7 @@ function Telemetry::__int_counter_family%(prefix: string,
                                           name: string,
                                           labels: string_vec,
                                           helptext: string &default = "Zeek Script Metric",
-                                          unit: string &default = "1",
+                                          unit: string &default = "",
                                           is_sum: bool &default = F%): opaque of int_counter_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());
@@ -172,7 +172,7 @@ function Telemetry::__dbl_counter_family%(prefix: string,
                                           name: string,
                                           labels: string_vec,
                                           helptext: string &default = "Zeek Script Metric",
-                                          unit: string &default = "1",
+                                          unit: string &default = "",
                                           is_sum: bool &default = F%): opaque of dbl_counter_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());
@@ -232,7 +232,7 @@ function Telemetry::__int_gauge_family%(prefix: string,
                                         name: string,
                                         labels: string_vec,
                                         helptext: string &default = "Zeek Script Metric",
-                                        unit: string &default = "1",
+                                        unit: string &default = "",
                                         is_sum: bool &default = F%): opaque of int_gauge_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());
@@ -298,7 +298,7 @@ function Telemetry::__dbl_gauge_family%(prefix: string,
                                         name: string,
                                         labels: string_vec,
                                         helptext: string &default = "Zeek Script Metric",
-                                        unit: string &default = "1",
+                                        unit: string &default = "",
                                         is_sum: bool &default = F%): opaque of dbl_gauge_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());
@@ -365,7 +365,7 @@ function Telemetry::__int_histogram_family%(prefix: string,
                                             labels: string_vec,
                                             bounds: int_vec,
                                             helptext: string &default = "Zeek Script Metric",
-                                            unit: string &default = "1",
+                                            unit: string &default = "",
                                             is_sum: bool &default = F%): opaque of int_histogram_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());
@@ -428,7 +428,7 @@ function Telemetry::__dbl_histogram_family%(prefix: string,
                                             labels: string_vec,
                                             bounds: double_vec,
                                             helptext: string &default = "Zeek Script Metric",
-                                            unit: string &default = "1",
+                                            unit: string &default = "",
                                             is_sum: bool &default = F%): opaque of dbl_histogram_metric_family
 	%{
 	auto lbl_vec = sv_vec(labels->AsVectorVal());

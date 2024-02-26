@@ -92,7 +92,7 @@ class BaseHistogramFamily : public MetricFamily,
                             public std::enable_shared_from_this<BaseHistogramFamily<HistogramType, BaseType>> {
 public:
     BaseHistogramFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                        std::string_view helptext, std::string_view unit = "1")
+                        std::string_view helptext, std::string_view unit = "")
         : MetricFamily(prefix, name, labels, helptext, unit, false) {}
 
     // TODO: the opentelemetry API doesn't have direct access to the bucket information
@@ -153,8 +153,7 @@ public:
     static inline const char* OpaqueName = "IntHistogramMetricFamilyVal";
 
     IntHistogramFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                       Span<const int64_t> default_upper_bounds, std::string_view helptext,
-                       std::string_view unit = "1");
+                       Span<const int64_t> default_upper_bounds, std::string_view helptext, std::string_view unit = "");
 
     IntHistogramFamily(const IntHistogramFamily&) noexcept = delete;
     IntHistogramFamily& operator=(const IntHistogramFamily&) noexcept = delete;
@@ -170,7 +169,7 @@ public:
     static inline const char* OpaqueName = "DblHistogramMetricFamilyVal";
 
     DblHistogramFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                       Span<const double> default_upper_bounds, std::string_view helptext, std::string_view unit = "1");
+                       Span<const double> default_upper_bounds, std::string_view helptext, std::string_view unit = "");
 
     DblHistogramFamily(const DblHistogramFamily&) noexcept = delete;
     DblHistogramFamily& operator=(const DblHistogramFamily&) noexcept = delete;

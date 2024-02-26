@@ -577,7 +577,7 @@ SCENARIO("telemetry managers provide access to gauge families") {
     GIVEN("a telemetry manager") {
         Manager mgr;
         WHEN("retrieving an IntGauge family") {
-            auto family = mgr.GaugeFamily("zeek", "open-connections", {"protocol"}, "test");
+            auto family = mgr.GaugeFamily("zeek", "open-connections", {"protocol"}, "test", "1");
             THEN("the family object stores the parameters") {
                 CHECK_EQ(family->Prefix(), "zeek"sv);
                 CHECK_EQ(family->Name(), "open-connections"sv);

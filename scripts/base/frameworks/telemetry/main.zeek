@@ -22,7 +22,7 @@ export {
 		## The human-readable name of the metric.
 		name: string;
 
-		## The unit of the metric. Use the pseudo-unit "1" if this is a unit-less metric.
+		## The unit of the metric. Set to a blank string if this is a unit-less metric.
 		unit: string;
 
 		## Documentation for this metric.
@@ -407,7 +407,7 @@ function register_counter_family(opts: MetricOpts): CounterFamily
 global error_counter_cf = register_counter_family([
 	$prefix="zeek",
 	$name="telemetry_counter_usage_error",
-	$unit="1",
+	$unit="",
 	$help_text="This counter is returned when label usage for counters is wrong. Check reporter.log if non-zero."
 ]);
 
@@ -467,7 +467,7 @@ function register_gauge_family(opts: MetricOpts): GaugeFamily
 global error_gauge_cf = register_gauge_family([
 	$prefix="zeek",
 	$name="telemetry_gauge_usage_error",
-	$unit="1",
+	$unit="",
 	$help_text="This gauge is returned when label usage for gauges is wrong. Check reporter.log if non-zero."
 ]);
 
@@ -537,7 +537,7 @@ function register_histogram_family(opts: MetricOpts): HistogramFamily
 global error_histogram_hf = register_histogram_family([
 	$prefix="zeek",
 	$name="telemetry_histogram_usage_error",
-	$unit="1",
+	$unit="",
 	$help_text="This histogram is returned when label usage for histograms is wrong. Check reporter.log if non-zero.",
 	$bounds=vector(1.0)
 ]);
@@ -585,7 +585,7 @@ event run_sync_hook()
 global version_gauge_family = Telemetry::register_gauge_family([
 	$prefix="zeek",
 	$name="version_info",
-	$unit="1",
+	$unit="",
 	$help_text="The Zeek version",
 	$labels=vector("version_number", "major", "minor", "patch", "commit",
                        "beta", "debug","version_string")

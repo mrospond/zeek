@@ -72,7 +72,7 @@ public:
      */
     template<class ValueType = int64_t>
     auto CounterFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                       std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                       std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                        opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto fam = LookupFamily(prefix, name);
 
@@ -99,7 +99,7 @@ public:
     /// @copydoc CounterFamily
     template<class ValueType = int64_t>
     auto CounterFamily(std::string_view prefix, std::string_view name, std::initializer_list<std::string_view> labels,
-                       std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                       std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                        opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto lbl_span = Span{labels.begin(), labels.size()};
         return CounterFamily<ValueType>(prefix, name, lbl_span, helptext, unit, is_sum, callback);
@@ -119,7 +119,7 @@ public:
      */
     template<class ValueType = int64_t>
     Counter<ValueType> CounterInstance(std::string_view prefix, std::string_view name, Span<const LabelView> labels,
-                                       std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                                       std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                                        opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         return WithLabelNames(labels, [&, this](auto labelNames) {
             auto family = CounterFamily<ValueType>(prefix, name, labelNames, helptext, unit, is_sum, callback);
@@ -131,7 +131,7 @@ public:
     template<class ValueType = int64_t>
     Counter<ValueType> CounterInstance(std::string_view prefix, std::string_view name,
                                        std::initializer_list<LabelView> labels, std::string_view helptext,
-                                       std::string_view unit = "1", bool is_sum = false,
+                                       std::string_view unit = "", bool is_sum = false,
                                        opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto lbl_span = Span{labels.begin(), labels.size()};
         return CounterInstance<ValueType>(prefix, name, lbl_span, helptext, unit, is_sum, callback);
@@ -150,7 +150,7 @@ public:
      */
     template<class ValueType = int64_t>
     auto GaugeFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                     std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                     std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                      opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto fam = LookupFamily(prefix, name);
 
@@ -176,7 +176,7 @@ public:
     /// @copydoc GaugeFamily
     template<class ValueType = int64_t>
     auto GaugeFamily(std::string_view prefix, std::string_view name, std::initializer_list<std::string_view> labels,
-                     std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                     std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                      opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto lbl_span = Span{labels.begin(), labels.size()};
         return GaugeFamily<ValueType>(prefix, name, lbl_span, helptext, unit, is_sum, callback);
@@ -197,7 +197,7 @@ public:
     template<class ValueType = int64_t>
     std::shared_ptr<Gauge<ValueType>> GaugeInstance(std::string_view prefix, std::string_view name,
                                                     Span<const LabelView> labels, std::string_view helptext,
-                                                    std::string_view unit = "1", bool is_sum = false,
+                                                    std::string_view unit = "", bool is_sum = false,
                                                     opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         return WithLabelNames(labels, [&, this](auto labelNames) {
             auto family = GaugeFamily<ValueType>(prefix, name, labelNames, helptext, unit, is_sum, callback);
@@ -209,7 +209,7 @@ public:
     template<class ValueType = int64_t>
     std::shared_ptr<Gauge<ValueType>> GaugeInstance(std::string_view prefix, std::string_view name,
                                                     std::initializer_list<LabelView> labels, std::string_view helptext,
-                                                    std::string_view unit = "1", bool is_sum = false,
+                                                    std::string_view unit = "", bool is_sum = false,
                                                     opentelemetry::metrics::ObservableCallbackPtr callback = nullptr) {
         auto lbl_span = Span{labels.begin(), labels.size()};
         return GaugeInstance<ValueType>(prefix, name, lbl_span, helptext, unit, is_sum, callback);
@@ -250,7 +250,7 @@ public:
     template<class ValueType = int64_t>
     auto HistogramFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
                          ConstSpan<ValueType> default_upper_bounds, std::string_view helptext,
-                         std::string_view unit = "1") {
+                         std::string_view unit = "") {
         auto fam = LookupFamily(prefix, name);
 
         if constexpr ( std::is_same<ValueType, int64_t>::value ) {
@@ -278,7 +278,7 @@ public:
     template<class ValueType = int64_t>
     auto HistogramFamily(std::string_view prefix, std::string_view name, std::initializer_list<std::string_view> labels,
                          ConstSpan<ValueType> default_upper_bounds, std::string_view helptext,
-                         std::string_view unit = "1") {
+                         std::string_view unit = "") {
         auto lbl_span = Span{labels.begin(), labels.size()};
         return HistogramFamily<ValueType>(prefix, name, lbl_span, default_upper_bounds, helptext, unit);
     }
@@ -306,7 +306,7 @@ public:
     template<class ValueType = int64_t>
     Histogram<ValueType> HistogramInstance(std::string_view prefix, std::string_view name, Span<const LabelView> labels,
                                            ConstSpan<ValueType> default_upper_bounds, std::string_view helptext,
-                                           std::string_view unit = "1") {
+                                           std::string_view unit = "") {
         return WithLabelNames(labels, [&, this](auto labelNames) {
             auto family = HistogramFamily<ValueType>(prefix, name, labelNames, default_upper_bounds, helptext, unit);
             return family.getOrAdd(labels);
@@ -318,7 +318,7 @@ public:
     Histogram<ValueType> HistogramInstance(std::string_view prefix, std::string_view name,
                                            std::initializer_list<LabelView> labels,
                                            ConstSpan<ValueType> default_upper_bounds, std::string_view helptext,
-                                           std::string_view unit = "1") {
+                                           std::string_view unit = "") {
         auto lbls = Span{labels.begin(), labels.size()};
         return HistogramInstance<ValueType>(prefix, name, lbls, default_upper_bounds, helptext, unit);
     }

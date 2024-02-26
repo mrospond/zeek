@@ -127,7 +127,7 @@ template<class GaugeType, typename BaseType>
 class BaseGaugeFamily : public MetricFamily, public std::enable_shared_from_this<BaseGaugeFamily<GaugeType, BaseType>> {
 public:
     BaseGaugeFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                    std::string_view helptext, std::string_view unit = "1", bool is_sum = false)
+                    std::string_view helptext, std::string_view unit = "", bool is_sum = false)
         : MetricFamily(prefix, name, labels, helptext, unit, is_sum) {}
 
     /**
@@ -166,7 +166,7 @@ public:
     static inline const char* OpaqueName = "IntGaugeMetricFamilyVal";
 
     IntGaugeFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                   std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                   std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                    opentelemetry::metrics::ObservableCallbackPtr callback = nullptr);
 
     IntGaugeFamily(const IntGaugeFamily&) noexcept = default;
@@ -183,7 +183,7 @@ public:
     static inline const char* OpaqueName = "DblGaugeMetricFamilyVal";
 
     DblGaugeFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                   std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                   std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                    opentelemetry::metrics::ObservableCallbackPtr callback = nullptr);
 
     DblGaugeFamily(const DblGaugeFamily&) noexcept = default;

@@ -95,7 +95,7 @@ public:
 
 protected:
     MetricFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> lbls,
-                 std::string_view helptext, std::string_view unit = "1", bool is_sum = false);
+                 std::string_view helptext, std::string_view unit, bool is_sum = false);
 
     /**
      * Adds a view to the MeterProvider.

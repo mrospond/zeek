@@ -90,7 +90,7 @@ class BaseCounterFamily : public MetricFamily,
                           public std::enable_shared_from_this<BaseCounterFamily<CounterType, BaseType>> {
 public:
     BaseCounterFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                      std::string_view helptext, std::string_view unit = "1", bool is_sum = false)
+                      std::string_view helptext, std::string_view unit = "", bool is_sum = false)
         : MetricFamily(prefix, name, labels, helptext, unit, is_sum) {}
 
     /**
@@ -134,7 +134,7 @@ public:
     static inline const char* OpaqueName = "IntCounterMetricFamilyVal";
 
     explicit IntCounterFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                              std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                              std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                               opentelemetry::metrics::ObservableCallbackPtr callback = nullptr);
 
     IntCounterFamily(const IntCounterFamily&) noexcept = default;
@@ -151,7 +151,7 @@ public:
     static inline const char* OpaqueName = "DblCounterMetricFamilyVal";
 
     explicit DblCounterFamily(std::string_view prefix, std::string_view name, Span<const std::string_view> labels,
-                              std::string_view helptext, std::string_view unit = "1", bool is_sum = false,
+                              std::string_view helptext, std::string_view unit = "", bool is_sum = false,
                               opentelemetry::metrics::ObservableCallbackPtr callback = nullptr);
 
     DblCounterFamily(const DblCounterFamily&) noexcept = default;
