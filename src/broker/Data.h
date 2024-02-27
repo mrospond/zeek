@@ -659,6 +659,11 @@ public:
      */
     BrokerData Build() && { return BrokerData{broker::data{std::move(values_)}}; }
 
+    /**
+     * Returns the number of elements added to the list.
+     */
+    broker::vector::size_type Size() const { return values_.size(); }
+
 private:
     broker::vector values_;
 };

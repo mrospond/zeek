@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "zeek/RE.h"
+#include "zeek/Val.h"
 
 #include "opentelemetry/sdk/metrics/push_metric_exporter.h"
 
@@ -50,6 +51,8 @@ private:
     std::string endpoint;
     std::vector<std::string> prefixes;
     opentelemetry::sdk::metrics::AggregationTemporality aggregation_temporality;
+
+    std::map<std::string, RecordValPtr> records;
 
     zeek::RE_Matcher prefix_matcher;
 

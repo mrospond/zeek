@@ -127,6 +127,14 @@ public:
     bool operator==(const MetricAttributeIterable& other) const noexcept { return attributes == other.attributes; }
 
     bool operator==(const Span<const LabelView>& other) const noexcept;
+    std::vector<std::string> LabelValues() const {
+        std::vector<std::string> values;
+        values.reserve(attributes.size());
+        for ( const auto& [k, v] : attributes ) {
+            values.push_back(v);
+        }
+        return values;
+    }
 
 private:
     std::map<opentelemetry::nostd::string_view, opentelemetry::common::AttributeValue> otel_attributes;

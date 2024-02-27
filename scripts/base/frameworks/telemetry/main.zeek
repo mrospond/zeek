@@ -362,6 +362,8 @@ export {
 		count_sum: count &optional;
 	};
 
+	type MetricVector : vector of Metric;
+
 	## Collect all counter and gauge metrics matching the given *name* and *prefix*.
 	##
 	## For histogram metrics, use the :zeek:see:`Telemetry::collect_histogram_metrics`.
@@ -560,7 +562,7 @@ function histogram_observe(h: Histogram, measurement: double): bool
 	return Telemetry::__dbl_histogram_observe(h$__metric, measurement);
 	}
 
-function histogram_family_observe(hf: HistogramFamily,  label_values: labels_vector, measurement: double): bool
+function histogram_family_observe(hf: HistogramFamily, label_values: labels_vector, measurement: double): bool
 	{
 	return histogram_observe(histogram_with(hf, label_values), measurement);
 	}
@@ -604,4 +606,9 @@ event zeek_init()
 	                      v$version_string);
 
 	Telemetry::gauge_family_set(version_gauge_family, labels, 1.0);
+	}
+
+event update_remote_telemetry_counters(updates: vector of Metric)
+	{
+	print "counter updates", updates;
 	}

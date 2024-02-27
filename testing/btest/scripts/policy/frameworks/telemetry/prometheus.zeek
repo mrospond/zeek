@@ -31,6 +31,9 @@ redef Cluster::nodes = {
 @load policy/frameworks/cluster/experimental
 @load policy/frameworks/telemetry/prometheus
 @load base/frameworks/telemetry
+
+@if ( Cluster::node == "manager-1" )
+
 @load base/utils/active-http
 
 # Query the Prometheus endpoint using ActiveHTTP for testing, oh my.
@@ -67,7 +70,6 @@ event run_test()
 		}
 	}
 
-@if ( Cluster::node == "manager-1" )
 # Use a dynamic metrics port for testing to avoid colliding on 9911/tcp
 # when running tests in parallel.
 global orig_metrics_port = Telemetry::metrics_port;

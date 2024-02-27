@@ -81,7 +81,7 @@ public:
                 return std::static_pointer_cast<IntCounterFamily>(fam);
 
             auto int_fam = std::make_shared<IntCounterFamily>(prefix, name, labels, helptext, unit, is_sum, callback);
-            families.push_back(int_fam);
+            families.insert_or_assign(int_fam->FullName(), int_fam);
             return int_fam;
         }
         else {
@@ -91,7 +91,7 @@ public:
                 return std::static_pointer_cast<DblCounterFamily>(fam);
 
             auto dbl_fam = std::make_shared<DblCounterFamily>(prefix, name, labels, helptext, unit, is_sum, callback);
-            families.push_back(dbl_fam);
+            families.insert_or_assign(dbl_fam->FullName(), dbl_fam);
             return dbl_fam;
         }
     }
@@ -159,7 +159,7 @@ public:
                 return std::static_pointer_cast<IntGaugeFamily>(fam);
 
             auto int_fam = std::make_shared<IntGaugeFamily>(prefix, name, labels, helptext, unit, is_sum, callback);
-            families.push_back(int_fam);
+            families.insert_or_assign(int_fam->FullName(), int_fam);
             return int_fam;
         }
         else {
@@ -168,7 +168,7 @@ public:
                 return std::static_pointer_cast<DblGaugeFamily>(fam);
 
             auto dbl_fam = std::make_shared<DblGaugeFamily>(prefix, name, labels, helptext, unit, is_sum, callback);
-            families.push_back(dbl_fam);
+            families.insert_or_assign(dbl_fam->FullName(), dbl_fam);
             return dbl_fam;
         }
     }
@@ -259,7 +259,7 @@ public:
 
             auto int_fam =
                 std::make_shared<IntHistogramFamily>(prefix, name, labels, default_upper_bounds, helptext, unit);
-            families.push_back(int_fam);
+            families.insert_or_assign(int_fam->FullName(), int_fam);
             return int_fam;
         }
         else {
@@ -269,7 +269,7 @@ public:
 
             auto dbl_fam =
                 std::make_shared<DblHistogramFamily>(prefix, name, labels, default_upper_bounds, helptext, unit);
-            families.push_back(dbl_fam);
+            families.insert_or_assign(dbl_fam->FullName(), dbl_fam);
             return dbl_fam;
         }
     }
@@ -359,7 +359,15 @@ public:
      */
     void SetMetricsExportPrefixes(std::vector<std::string> filter);
 
+    bool IsExporting() const { return ! export_topic.empty() && ! export_endpoint.empty(); }
+
     const std::string& MetricsSchema() const { return metrics_schema; }
+
+    std::shared_ptr<MetricFamily> GetFamilyByFullName(const std::string& full_name) const {
+        if ( auto it = families.find(full_name); it != families.end() )
+            return it->second;
+        return nullptr;
+    }
 
 protected:
     template<class F>
@@ -386,7 +394,7 @@ private:
     std::string metrics_schema;
 
     std::shared_ptr<OtelReader> otel_reader;
-    std::vector<std::shared_ptr<MetricFamily>> families;
+    std::map<std::string, std::shared_ptr<MetricFamily>> families;
 
     detail::process_stats current_process_stats;
     double process_stats_last_updated = 0.0;
@@ -406,7 +414,6 @@ private:
 } // namespace zeek::telemetry
 
 namespace zeek {
-
 extern telemetry::Manager* telemetry_mgr;
 
 } // namespace zeek

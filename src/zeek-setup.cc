@@ -661,7 +661,7 @@ SetupResult setup(int argc, char** argv, Options* zopts) {
     // policy, but we can't parse policy without DNS resolution.
     dns_mgr->SetDir(".state");
 
-    telemetry_mgr = new telemetry::Manager;
+    telemetry_mgr = new telemetry::Manager();
     iosource_mgr = new iosource::Manager();
     event_registry = new EventRegistry();
     packet_mgr = new packet_analysis::Manager();
@@ -811,12 +811,15 @@ SetupResult setup(int argc, char** argv, Options* zopts) {
 
         RecordType::InitPostScript();
 
-        telemetry_mgr->InitPostScript();
         iosource_mgr->InitPostScript();
         log_mgr->InitPostScript();
         plugin_mgr->InitPostScript();
         zeekygen_mgr->InitPostScript();
         broker_mgr->InitPostScript();
+
+        // telemetry_mgr's post-script setup needs to run after broker's because it may add some
+        // topics for import/export, and broker needs to be initialized for that to happen.
+        telemetry_mgr->InitPostScript();
         timer_mgr->InitPostScript();
         event_mgr.InitPostScript();
 

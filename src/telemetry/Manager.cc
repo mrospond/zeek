@@ -8,6 +8,7 @@
 
 #include "zeek/3rdparty/doctest.h"
 #include "zeek/ID.h"
+#include "zeek/ZeekString.h"
 #include "zeek/broker/Manager.h"
 #include "zeek/telemetry/OtelReader.h"
 #include "zeek/telemetry/OtelTopicExporter.h"
@@ -127,6 +128,17 @@ void Manager::InitPostScript() {
     auto mp = metrics_api::Provider::GetMeterProvider();
     auto* p = static_cast<metrics_sdk::MeterProvider*>(mp.get());
 
+    // This environment variable will enable an ostream exporter for otel-cpp. This will dump metrics data
+    // to the console once every second.
+    if ( auto env = getenv("OTEL_DEBUG") ) {
+        auto os_exporter = exportermetrics::OStreamMetricExporterFactory::Create();
+        metrics_sdk::PeriodicExportingMetricReaderOptions options;
+        options.export_interval_millis = std::chrono::milliseconds(1000);
+        options.export_timeout_millis = std::chrono::milliseconds(500);
+        auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(os_exporter), options);
+        p->AddMetricReader(std::move(reader));
+    }
+
     std::string prometheus_url;
     if ( auto env = getenv("ZEEK_METRICS_PORT") )
         prometheus_url = util::fmt("localhost:%s", env);
@@ -141,6 +153,7 @@ void Manager::InitPostScript() {
     }
 
     if ( ! prometheus_url.empty() ) {
+        printf("prometheus configured\n");
         opentelemetry::exporter::metrics::PrometheusExporterOptions exporter_options;
         exporter_options.url = prometheus_url;
         auto exporter = exportermetrics::PrometheusExporterFactory::Create(exporter_options);
@@ -156,46 +169,82 @@ void Manager::InitPostScript() {
             reporter->Warning("BROKER_METRICS_IMPORT_TOPICS is deprecated, use ZEEK_METRICS_IMPORT_TOPICS.");
             topics = util::split(std::string{env}, ":");
         }
+        else {
+            auto script_topics = id::find_val("Telemetry::metrics_import_topics")->AsVectorVal();
+            for ( int i = 0; i < script_topics->Size(); i++ )
+                topics.push_back(script_topics->StringValAt(i)->ToStdString());
+        }
 
         for ( const auto& topic : topics ) {
             broker_mgr->Subscribe(topic);
         }
-
-        // TODO: Process incoming data
     }
 
-    if ( auto env = getenv("OTEL_DEBUG") ) {
-        auto os_exporter = exportermetrics::OStreamMetricExporterFactory::Create();
+    if ( export_topic.empty() ) {
+        if ( auto env = getenv("ZEEK_METRICS_EXPORT_TOPIC") )
+            export_topic = env;
+        else if ( auto env = getenv("BROKER_METRICS_EXPORT_TOPIC") ) {
+            reporter->Warning("BROKER_METRICS_EXPORT_TOPIC is deprecated, use ZEEK_METRICS_EXPORT_TOPIC.");
+            export_topic = env;
+        }
+        else {
+            auto script_topic = id::find_val("Telemetry::metrics_export_topic")->AsStringVal();
+            export_topic = script_topic->ToStdString();
+        }
+    }
+
+    if ( export_endpoint.empty() ) {
+        if ( auto env = getenv("ZEEK_METRICS_ENDPOINT_NAME") )
+            export_endpoint = env;
+        else if ( auto env = getenv("BROKER_METRICS_ENDPOINT_NAME") ) {
+            reporter->Warning("BROKER_METRICS_ENDPOINT_NAME is deprecated, use ZEEK_METRICS_ENDPOINT_NAME.");
+            export_endpoint = env;
+        }
+        else {
+            auto script_name = id::find_val("Telemetry::metrics_export_endpoint_name")->AsStringVal();
+            export_endpoint = script_name->ToStdString();
+        }
+    }
+
+    if ( export_interval == 0 ) {
+        if ( auto env = getenv("ZEEK_METRICS_EXPORT_INTERVAL") )
+            export_interval = std::strtod(env, nullptr);
+        else if ( auto env = getenv("BROKER_METRICS_EXPORT_INTERVAL") ) {
+            reporter->Warning("BROKER_METRICS_EXPORT_INTERVAL is deprecated, use ZEEK_METRICS_EXPORT_INTERVAL.");
+            export_interval = std::strtod(env, nullptr);
+        }
+        else {
+            export_interval = id::find_val("Telemetry::metrics_export_interval")->AsInterval();
+        }
+    }
+
+    if ( export_prefixes.empty() ) {
+        if ( auto env = getenv("ZEEK_METRICS_EXPORT_PREFIXES") ) {
+            export_prefixes = util::split(std::string{env}, ":");
+        }
+        else if ( auto env = getenv("BROKER_METRICS_EXPORT_PREFIXES") ) {
+            reporter->Warning("BROKER_METRICS_EXPORT_PREFIXES is deprecated, use ZEEK_METRICS_EXPORT_PREFIXES.");
+            export_prefixes = util::split(std::string{env}, ":");
+        }
+        else {
+            auto script_topics = id::find_val("Telemetry::metrics_export_prefixes")->AsVectorVal();
+            for ( int i = 0; i < script_topics->Size(); i++ )
+                export_prefixes.push_back(script_topics->StringValAt(i)->ToStdString());
+        }
+    }
+
+    printf("topic: %s\n", export_topic.c_str());
+    printf("endpoint: %s\n", export_endpoint.c_str());
+    printf("interval: %f\n", export_interval);
+    printf("prefixes: %zu\n", export_prefixes.size());
+
+    if ( ! export_topic.empty() && ! export_endpoint.empty() && export_interval > 0 ) {
+        printf("topic exporter configured\n");
+        auto exporter = std::make_unique<detail::OtelTopicExporter>(export_topic, export_endpoint, export_prefixes);
         metrics_sdk::PeriodicExportingMetricReaderOptions options;
         options.export_interval_millis = std::chrono::milliseconds(1000);
         options.export_timeout_millis = std::chrono::milliseconds(500);
-        auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(os_exporter), options);
-        p->AddMetricReader(std::move(reader));
-    }
-
-    // If the export topic is set, create a periodic exporter to write data to it
-    if ( ! export_topic.empty() ) {
-        auto topic = export_topic;
-        if ( auto env = getenv("ZEEK_METRICS_EXPORT_TOPIC") )
-            topic = env;
-        else if ( auto env = getenv("BROKER_METRICS_EXPORT_TOPIC") ) {
-            reporter->Warning("BROKER_METRICS_EXPORT_TOPIC is deprecated, use ZEEK_METRICS_EXPORT_TOPIC.");
-            topic = env;
-        }
-
-        auto endpoint = export_endpoint;
-        if ( auto env = getenv("ZEEK_METRICS_ENDPOINT_NAME") )
-            endpoint = env;
-        else if ( auto env = getenv("BROKER_METRICS_ENDPOINT_NAME") ) {
-            reporter->Warning("BROKER_METRICS_ENDPOINT_NAME is deprecated, use ZEEK_METRICS_ENDPOINT_NAME.");
-            endpoint = env;
-        }
-
-        auto topic_exporter = std::make_unique<detail::OtelTopicExporter>(topic, endpoint, export_prefixes);
-        metrics_sdk::PeriodicExportingMetricReaderOptions options;
-        options.export_interval_millis = std::chrono::seconds(static_cast<long long>(export_interval));
-        options.export_timeout_millis = std::chrono::milliseconds(500);
-        auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(topic_exporter), options);
+        auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(exporter), options);
         p->AddMetricReader(std::move(reader));
     }
 
@@ -250,10 +299,10 @@ void Manager::InitPostScript() {
 }
 
 std::shared_ptr<MetricFamily> Manager::LookupFamily(std::string_view prefix, std::string_view name) const {
-    auto check = [&](const auto& fam) { return fam->Prefix() == prefix && fam->Name() == name; };
+    auto check = [&](const auto& fam) { return fam.second->Prefix() == prefix && fam.second->Name() == name; };
 
     if ( auto it = std::find_if(families.begin(), families.end(), check); it != families.end() )
-        return *it;
+        return it->second;
 
     return nullptr;
 }
@@ -274,7 +323,7 @@ ValPtr Manager::CollectMetrics(std::string_view prefix_pattern, std::string_view
     // Build a map of all of the families that match the patterns based on their full prefixed
     // name. This will let us match those families against the items returned from the otel reader.
     std::map<std::string, std::shared_ptr<MetricFamily>> matched_families;
-    for ( const auto& family : families ) {
+    for ( const auto& [name, family] : families ) {
         if ( family->Matches(prefix_pattern, name_pattern) )
             matched_families.insert({family->FullName(), family});
     }
@@ -372,7 +421,7 @@ ValPtr Manager::CollectHistogramMetrics(std::string_view prefix_pattern, std::st
     // Build a map of all of the families that match the patterns based on their full prefixed
     // name. This will let us match those families against the items returned from the otel reader.
     std::map<std::string, std::shared_ptr<MetricFamily>> matched_families;
-    for ( const auto& family : families ) {
+    for ( const auto& [full_name, family] : families ) {
         if ( family->Matches(prefix_pattern, name_pattern) )
             matched_families.insert({family->FullName(), family});
     }

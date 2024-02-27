@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <type_traits>
 
+#include "zeek/ID.h"
 #include "zeek/Span.h"
 #include "zeek/telemetry/MetricFamily.h"
 #include "zeek/telemetry/telemetry.bif.h"
@@ -43,6 +44,11 @@ public:
     }
 
     BaseType Value() const noexcept { return value; }
+    BaseType Change() noexcept {
+        BaseType change = value - last_value;
+        last_value = value;
+        return change;
+    }
 
     /**
      * @return Whether @c this and @p other refer to the same counter.
@@ -55,6 +61,7 @@ public:
     bool operator!=(const BaseCounter<BaseType>& rhs) const noexcept { return ! IsSameAs(rhs); }
 
     bool CompareLabels(const Span<const LabelView>& labels) const { return attributes == labels; }
+    std::vector<std::string> LabelValues() const { return attributes.LabelValues(); }
 
 protected:
     explicit BaseCounter(Handle handle, Span<const LabelView> labels) noexcept
@@ -63,6 +70,7 @@ protected:
     Handle handle;
     MetricAttributeIterable attributes;
     BaseType value = 0;
+    BaseType last_value = 0;
 };
 
 /**
@@ -119,6 +127,8 @@ public:
     std::shared_ptr<CounterType> GetOrAdd(std::initializer_list<LabelView> labels) {
         return GetOrAdd(Span{labels.begin(), labels.size()});
     }
+
+    std::vector<std::shared_ptr<CounterType>>& GetAllCounters() { return counters; }
 
 protected:
     opentelemetry::nostd::shared_ptr<opentelemetry::metrics::Counter<BaseType>> instrument;
