@@ -230,13 +230,13 @@ if (ZEEK_STANDALONE)
     endif ()
     # Tell zeek_target_link_libraries to add library dependencies as PRIVATE.
     set(zeek_exe_access PRIVATE)
-else ()
-    add_library(zeek_lib STATIC)
 
     if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
         target_link_libraries(zeek_exe PRIVATE util)
         target_link_libraries(zeek_exe PRIVATE procstat)
     endif ()
+else ()
+    add_library(zeek_lib STATIC)
 endif ()
 
 if (TARGET zeek_lib)
@@ -254,6 +254,7 @@ if (TARGET zeek_lib)
         target_link_libraries(zeek_exe PRIVATE util)
         target_link_libraries(zeek_exe PRIVATE procstat)
     endif ()
+
 endif ()
 
 # When building our fuzzers, we also need one extra top-level target that

@@ -192,13 +192,6 @@ process_stats get_process_stats() {
     return result;
 }
 
-#else
-
-process_stats get_process_stats() {
-    process_stats result = {0};
-    return result;
-}
-
 } // namespace zeek::telemetry::detail
 
 #endif
