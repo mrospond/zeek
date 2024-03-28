@@ -17,6 +17,7 @@ RUN apt-get update && apt-get -y install \
     g++ \
     gcc \
     git \
+    jq \
     libkrb5-dev \
     libmaxminddb-dev \
     libpcap-dev \
