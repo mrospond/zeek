@@ -52,6 +52,7 @@ global btest_sample_histogram_hf = Telemetry::register_histogram_family([
 function print_metrics(what: string, metrics: vector of Telemetry::Metric)
 	{
 	print fmt("### %s |%s|", what, |metrics|);
+
 	for (i in metrics)
 		{
 		local m = metrics[i];
@@ -65,6 +66,7 @@ function print_metrics(what: string, metrics: vector of Telemetry::Metric)
 function print_histogram_metrics(what: string, metrics: vector of Telemetry::HistogramMetric)
 	{
 	print fmt("### %s |%s|", what, |metrics|);
+
 	for (i in metrics)
 		{
 		local m = metrics[i];
