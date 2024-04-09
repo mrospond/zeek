@@ -103,6 +103,7 @@ static double mem_prof_overhead = compute_mem_prof_overhead();
 #define ZAM_PROFILE_POST_CALL
 static double CPU_prof_overhead = 0.0;
 static double mem_prof_overhead = 0.0;
+static bool profile_all = false;
 
 #endif
 
