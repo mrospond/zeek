@@ -31,7 +31,7 @@ public:
      * Increments the value by @p amount.
      * @pre `amount >= 0`
      */
-    void Inc(BaseType amount) noexcept { handle->Increment(amount); }
+    void Inc(BaseType amount) noexcept { handle.Increment(amount); }
 
     /**
      * Increments the value by 1.
@@ -43,18 +43,22 @@ public:
     }
 
     BaseType Value() const noexcept {
-        // Use Collect() here instead of Value() to correctly handle metrics with
-        // callbacks.
-        auto metric = handle->Collect();
-        return static_cast<BaseType>(metric.counter.value);
+        if ( has_callback ) {
+            // Use Collect() here instead of Value() to correctly handle metrics with
+            // callbacks.
+            auto metric = handle.Collect();
+            return static_cast<BaseType>(metric.counter.value);
+        }
+
+        return handle.Value();
     }
 
     /**
      * Directly sets the value of the counter.
      */
     void Set(BaseType v) {
-        handle->Reset();
-        handle->Increment(v);
+        handle.Reset();
+        handle.Increment(v);
     }
 
     /**
@@ -71,13 +75,16 @@ public:
 protected:
     explicit BaseCounter(FamilyType* family, const prometheus::Labels& labels,
                          prometheus::CollectCallbackPtr callback = nullptr) noexcept
-        : handle(&(family->Add(labels))), labels(labels) {
-        if ( callback )
-            handle->AddCollectCallback(callback);
+        : handle(family->Add(labels)), labels(labels) {
+        if ( callback ) {
+            handle.AddCollectCallback(callback);
+            has_callback = true;
+        }
     }
 
-    Handle* handle;
+    Handle& handle;
     prometheus::Labels labels;
+    bool has_callback = false;
 };
 
 /**
