@@ -90,7 +90,6 @@ private:
     friend class OptAssignZBI;
     friend class SortZBI;
     friend class CatZBI;
-    friend class LogWriteZBI;
     friend class MultiZBI;
 
     void Init();
