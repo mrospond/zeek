@@ -133,6 +133,9 @@ WriterFrontend::~WriterFrontend() {
 }
 
 void WriterFrontend::Stop() {
+    if ( disabled )
+        return;
+
     FlushWriteBuffer();
     SetDisable();
 
@@ -204,6 +207,9 @@ void WriterFrontend::Write(int arg_num_fields, Value** vals) {
 }
 
 void WriterFrontend::FlushWriteBuffer() {
+    if ( disabled )
+        return;
+
     if ( ! write_buffer_pos )
         // Nothing to do.
         return;
